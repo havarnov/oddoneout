@@ -137,7 +137,7 @@ async function add() {
     });
     r.edges_rest.forEach(e => {
         let i = r.pages.findIndex(p => p.title === e.targetTitle);
-        if (i !== -1 && !edges_blueprint.find(p => p.sourceTitle === e.sourceTitle && r.pages[i].title === p.targetTitle)) {
+        if (i !== -1 && !edges_blueprint.find(p => p.sourceTitle === e.sourceTitle && r.pages[i].title === p.targetTitle)) {
             edges_blueprint.push({ sourceTitle: e.sourceTitle, targetTitle: r.pages[i].title });
         }
     });
