@@ -26,7 +26,7 @@ function fetchRandom() {
         .then(response => response.json())
         .then(function(response) {
             let randomPage = response.query.random[0];
-            return { title: randomPage.title, id: randomPage.id };
+            return { title: randomPage.title };
         })
         .then(r => {
                 return r;
@@ -34,11 +34,11 @@ function fetchRandom() {
         .catch(function(error){console.log(error);});
 }
 
-function fetchOutgoingPageTitles(pageId) {
+function fetchOutgoingPageTitles(pageTitle) {
 
     let params = {
         action: "query",
-        pageids: pageId,
+        titles: pageTitle,
         prop: "links",
         pllimit: "max",
         format: "json"
@@ -49,7 +49,7 @@ function fetchOutgoingPageTitles(pageId) {
     return fetch(url)
         .then(response => response.json())
         .then(function(response) {
-            let pages = response.query.pages[pageId].links;
+            let pages = Object.values(response.query.pages)[0].links;
             if (!pages)
             {
                 return [];
@@ -57,7 +57,7 @@ function fetchOutgoingPageTitles(pageId) {
 
             return pages
                 .filter(i => i.ns === 0)
-                .map(i => { return { title: i.title, id: null }; });
+                .map(i => { return { title: i.title }; });
         })
         .then(r => {
             return r;
@@ -66,35 +66,9 @@ function fetchOutgoingPageTitles(pageId) {
 }
 
 
-function fetchIdByTitle(title) {
-
-    let title_n = title.replace(/\s/g, "_");
-
-    // https://en.wikipedia.org/w/api.php?action=query&titles=MOS:FILM&pllimit=max&format=json
-    let params = {
-        action: "query",
-        titles: title_n,
-        format: "json"
-    };
-
-    let url = createUrl(params);
-
-    return fetch(url)
-        .then(response => response.json())
-        .then(function(response) {
-            return { title: title, id: Object.keys(response.query.pages)[0] };
-        })
-        .then(r => {
-            return r;
-        })
-        .catch(function(error){console.log(error);});
-}
-
-async function fetchRandomLinked(pageId) {
-    let links = await fetchOutgoingPageTitles(pageId);
+async function fetchRandomLinked(pageTitle) {
+    let links = await fetchOutgoingPageTitles(pageTitle);
     let item = links[Math.floor(Math.random() * links.length)];
-
-    item = await fetchIdByTitle(item.title);
     return { random: item, rest: links.filter(i => i.title !== item.title) };
 }
 
@@ -107,15 +81,15 @@ async function create(n, progress) {
 
     while (res.length < n) {
         let item = res[Math.floor(Math.random() * res.length)];
-        let resRandom = await fetchRandomLinked(item.id);
+        let resRandom = await fetchRandomLinked(item.title);
 
         let l = resRandom.random;
 
-        if (l.id && !res.find(i => i.id === l.id))
+        if (l.title && !res.find(i => i.title === l.title))
         {
             res.push(l);
-            e.push({ source: item.id, target: l.id });
-            resRandom.rest.forEach(i => e_rest.push({ source: item.id, targetTitle: i.title }));
+            e.push({sourceTitle: item.title, targetTitle: l.title });
+            resRandom.rest.forEach(i => e_rest.push({ sourceTitle: item.title, targetTitle: i.title }));
             progress(res.length, n + 1);
         }
     }
@@ -149,21 +123,22 @@ async function add() {
     btn.disabled = true;
     btn.innerText = "restart";
     let r = await create(nInput.value - 1, progress);
-    let oddone = await fetchRandom();
-    let outgoing = await fetchOutgoingPageTitles(oddone.id);
-    while (outgoing.find(o => r.pages.map(p => p.title).find(pt => pt === o.title))) {
+    let oddone = null;
+    let outgoing = null;
+    do {
         oddone = await fetchRandom();
-        outgoing = await fetchOutgoingPageTitles(oddone.id);
-    }
+        outgoing = await fetchOutgoingPageTitles(oddone.title);
+    } while (outgoing.find(o => r.pages.map(p => p.title).find(pt => pt === o.title)));
+
     r.pages.push(oddone);
     r.edges.forEach(e => edges_blueprint.push(e));
     r.pages.forEach(i => {
-        nodes.add({id: i.id, label: i.title });
+        nodes.add({id: i.title, label: i.title });
     });
     r.edges_rest.forEach(e => {
         let i = r.pages.findIndex(p => p.title === e.targetTitle);
-        if (i !== -1 && !edges_blueprint.find(p => p.source === e.source && r.pages[i].id === p.target)) {
-            edges_blueprint.push({ source: e.source, target: r.pages[i].id });
+        if (i !== -1 && !edges_blueprint.find(p => p.sourceTitle === e.sourceTitle && r.pages[i].title === p.targetTitle)) {
+            edges_blueprint.push({ sourceTitle: e.sourceTitle, targetTitle: r.pages[i].title });
         }
     });
 
@@ -196,7 +171,7 @@ function main() {
         }
 
         let clickedNodeId = params.nodes[0];
-        if (edges_blueprint.find(e => e.source === clickedNodeId || e.target === clickedNodeId))
+        if (edges_blueprint.find(e => e.sourceTitle === clickedNodeId || e.targetTitle === clickedNodeId))
         {
             console.log("failed");
             nodes.update({ id: clickedNodeId, color: 'red' });
@@ -205,7 +180,7 @@ function main() {
         {
             console.log("correct");
             nodes.update({ id: clickedNodeId, color: 'green' });
-            edges.add(edges_blueprint.map(e => { return {id: (e.source + e.target), from: e.source, to: e.target}; }));
+            edges.add(edges_blueprint.map(e => { return {id: (e.sourceTitle + e.targetTitle), from: e.sourceTitle, to: e.targetTitle}; }));
             edges_blueprint = [];
             var btn = document.getElementById("start");
             btn.disabled = false;
