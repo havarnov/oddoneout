@@ -68,6 +68,10 @@ function fetchOutgoingPageTitles(pageTitle) {
 
 async function fetchRandomLinked(pageTitle) {
     let links = await fetchOutgoingPageTitles(pageTitle);
+    if (links.length === 0) {
+        return null;
+    }
+
     let item = links[Math.floor(Math.random() * links.length)];
     return { random: item, rest: links.filter(i => i.title !== item.title) };
 }
@@ -82,6 +86,11 @@ async function create(n, progress) {
     while (res.length < n) {
         let item = res[Math.floor(Math.random() * res.length)];
         let resRandom = await fetchRandomLinked(item.title);
+
+        if (!resRandom)
+        {
+            continue;
+        }
 
         let l = resRandom.random;
 
